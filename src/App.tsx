@@ -22,7 +22,7 @@ function App() {
         )}
       </Board>
       <p className="hint">
-        Use arrow keys or WASD to move. Swipe on touch devices.
+        Use arrow keys or WASD to move. For mobile or touch screen devices, swipe on board to move.
       </p>
     </main>
   );
