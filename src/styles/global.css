@@ -1,0 +1,307 @@
+@import url('https://fonts.googleapis.com/css2?family=Roboto+Mono:wght@300;400;700&display=swap');
+
+:root {
+  /* Layout */
+  --gap: 10px;
+  --board-size: min(488px, calc(100vw - 32px));
+  --tile-size: calc((var(--board-size) - 5 * var(--gap)) / 4);
+  --radius: 8px;
+  --shadow: 0 4px 24px rgba(0, 0, 0, 0.4);
+
+  /* Colours */
+  --bg: #2B2838;
+  --board: #3A3848;
+  --tile-empty: #504E5E;
+  --text-primary: #FFFFFF;
+  --text-secondary: #9896A8;
+
+  /* Tile backgrounds */
+  --tile-2: #F4A07A;
+  --tile-4: #F0D060;
+  --tile-8: #80DC60;
+  --tile-16: #50D8C0;
+  --tile-32: #A0A0E8;
+  --tile-64: #C080D0;
+  --tile-128: #F060A0;
+  --tile-256: #E03080;
+  --tile-512: #E05030;
+  --tile-1024: #4090E0;
+  --tile-2048: #30D830;
+
+  /* Tile text */
+  --tile-text-2: #111111;
+  --tile-text-4: #111111;
+  --tile-text-8: #111111;
+  --tile-text-16: #111111;
+  --tile-text-32: #111111;
+  --tile-text-64: #111111;
+  --tile-text-128: #111111;
+  --tile-text-256: #FFFFFF;
+  --tile-text-512: #FFFFFF;
+  --tile-text-1024: #FFFFFF;
+  --tile-text-2048: #111111;
+
+  /* Typography */
+  --font: 'Roboto Mono', monospace;
+  --weight-light: 300;
+  --weight-regular: 400;
+  --weight-bold: 700;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html,
+body,
+#root {
+  margin: 0;
+  padding: 0;
+  min-height: 100%;
+}
+
+html {
+  overflow-x: hidden;
+}
+
+body {
+  background: var(--bg);
+  color: var(--text-primary);
+  font-family: var(--font);
+  font-weight: var(--weight-regular);
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  overflow-x: hidden;
+  min-height: 100vh;
+  min-height: 100dvh;
+}
+
+#root {
+  min-height: 100vh;
+  min-height: 100dvh;
+}
+
+.container {
+  width: min(520px, 100%);
+  max-width: 100%;
+  margin: 0 auto;
+  padding: 0 16px;
+  box-sizing: border-box;
+}
+
+/* Header */
+.header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 8px;
+  padding: 24px 0 16px;
+}
+
+.header__title {
+  margin: 0;
+  font-size: 3rem;
+  font-weight: var(--weight-bold);
+  color: var(--text-primary);
+  line-height: 1;
+}
+
+.header__actions {
+  display: flex;
+  gap: 8px;
+}
+
+/* Buttons */
+.btn {
+  background: var(--board);
+  color: var(--text-primary);
+  font-family: var(--font);
+  font-weight: var(--weight-regular);
+  font-size: 0.95rem;
+  border: none;
+  border-radius: var(--radius);
+  padding: 8px 16px;
+  cursor: pointer;
+  transition: opacity 120ms ease, transform 120ms ease;
+}
+
+.btn:hover {
+  opacity: 0.85;
+}
+
+.btn:active {
+  transform: translateY(1px);
+}
+
+.btn:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+
+.btn--primary {
+  background: var(--tile-2048);
+  color: var(--tile-text-2048);
+  font-weight: var(--weight-bold);
+}
+
+/* Focus visibility */
+.btn:focus-visible,
+[role="gridcell"]:focus-visible {
+  outline: 2px solid var(--text-primary);
+  outline-offset: 2px;
+}
+
+/* Stats */
+.stats {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 8px;
+  margin-bottom: 16px;
+}
+
+.stat-card {
+  background: var(--board);
+  border-radius: var(--radius);
+  padding: 10px 8px;
+  text-align: center;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.stat-card__caption {
+  font-size: 0.7rem;
+  font-weight: var(--weight-light);
+  color: var(--text-secondary);
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.stat-card__value {
+  font-size: 1.25rem;
+  font-weight: var(--weight-bold);
+  color: var(--text-primary);
+}
+
+/* Board */
+.board-wrapper {
+  position: relative;
+  width: var(--board-size);
+  height: var(--board-size);
+  max-width: 100%;
+  margin: 0 auto;
+  overflow: hidden;
+}
+
+.board {
+  width: var(--board-size);
+  height: var(--board-size);
+  max-width: 100%;
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  grid-template-rows: repeat(4, 1fr);
+  gap: var(--gap);
+  padding: var(--gap);
+  background: var(--board);
+  border-radius: var(--radius);
+  box-shadow: var(--shadow);
+}
+
+.cell {
+  background: var(--tile-empty);
+  border-radius: var(--radius);
+}
+
+.tile-layer {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+}
+
+.tile {
+  position: absolute;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: var(--radius);
+  font-family: var(--font);
+  font-weight: var(--weight-bold);
+  font-size: clamp(1rem, calc(var(--tile-size) * 0.3), 2.5rem);
+  width: var(--tile-size);
+  height: var(--tile-size);
+  top: calc(var(--gap) + 0 * (var(--tile-size) + var(--gap)));
+  left: calc(var(--gap) + 0 * (var(--tile-size) + var(--gap)));
+  transition: top 180ms ease, left 180ms ease;
+  will-change: top, left;
+}
+
+/* Overlay */
+.overlay {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 16px;
+  background: rgba(43, 40, 56, 0.85);
+  border-radius: var(--radius);
+  z-index: 10;
+  text-align: center;
+  padding: 24px;
+}
+
+.overlay__heading {
+  margin: 0;
+  font-size: 2.25rem;
+  font-weight: var(--weight-bold);
+  color: var(--text-primary);
+}
+
+.overlay__body {
+  margin: 0;
+  font-size: 1rem;
+  font-weight: var(--weight-regular);
+  color: var(--text-secondary);
+}
+
+.overlay__actions {
+  display: flex;
+  gap: 12px;
+  flex-wrap: wrap;
+  justify-content: center;
+}
+
+/* Animations */
+@keyframes popIn {
+  0% { transform: scale(0); opacity: 0; }
+  80% { transform: scale(1.1); }
+  100% { transform: scale(1); opacity: 1; }
+}
+.tile--new {
+  animation: popIn 180ms ease forwards;
+}
+
+@keyframes mergeFlash {
+  0% { transform: scale(1); }
+  50% { transform: scale(1.15); }
+  100% { transform: scale(1); }
+}
+.tile--merged {
+  animation: mergeFlash 180ms ease forwards;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .tile { transition: none; }
+  .tile--new, .tile--merged { animation: none; }
+}
+
+/* Footer hint */
+.hint {
+  margin: 16px 0 24px;
+  text-align: center;
+  font-size: 0.8rem;
+  font-weight: var(--weight-light);
+  color: var(--text-secondary);
+}
