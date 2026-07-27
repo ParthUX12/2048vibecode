@@ -292,6 +292,15 @@ body {
   animation: mergeFlash 180ms ease forwards;
 }
 
+.tile--removing {
+  animation: tileFade 180ms ease forwards;
+}
+
+@keyframes tileFade {
+  0% { opacity: 1; }
+  100% { opacity: 0; }
+}
+
 @media (prefers-reduced-motion: reduce) {
   .tile { transition: none; }
   .tile--new, .tile--merged { animation: none; }

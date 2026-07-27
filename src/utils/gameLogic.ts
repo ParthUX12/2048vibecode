@@ -15,6 +15,7 @@ export function createTile(
     col,
     isNew,
     isMerged: false,
+    isRemoving: false,
   };
 }
 
@@ -44,121 +45,102 @@ export function initBoard(): Tile[] {
   return tiles;
 }
 
-function resetFlags(tiles: Tile[]): Tile[] {
-  return tiles.map((t) => ({ ...t, isNew: false, isMerged: false }));
-}
-
-export interface MergeInfo {
-  newId: string;
-  value: number;
-  row: number;
-  col: number;
-  sourceIds: [string, string];
-}
-
 export interface MoveResult {
   tiles: Tile[];
-  merges: MergeInfo[];
   scoreDelta: number;
   moved: boolean;
 }
 
+/**
+ * Compute the result of a move in a single pass. The stationary merge partner
+ * keeps its id and gets a value bump + isMerged flash; the moving tile slides
+ * onto the partner's cell with isRemoving (lower z-index, fades out after the
+ * slide). This keeps the displayed value correct throughout the animation.
+ */
 export function move(tiles: Tile[], dir: Direction): MoveResult {
-  const cleared = resetFlags(tiles);
+  // Work on copies with flags cleared; preserve original ids.
+  const working = tiles.map((t) => ({
+    ...t,
+    isNew: false,
+    isMerged: false,
+    isRemoving: false,
+  }));
 
-  const traversals = buildTraversals(dir);
+  const order = traversalOrder(dir);
   const vector = vectorFor(dir);
 
-  // Grid holds the source tile currently occupying each cell during traversal.
   const grid: (Tile | null)[][] = Array.from({ length: SIZE }, () =>
     Array.from({ length: SIZE }, () => null)
   );
-  for (const t of cleared) grid[t.row][t.col] = t;
+  for (const t of working) grid[t.row][t.col] = t;
 
   let scoreDelta = 0;
   let moved = false;
-  const merges: MergeInfo[] = [];
-  // Cells that have already received a merge target.
-  const mergedAt: Set<string> = new Set();
-  // Slide phase tiles: source tiles repositioned to their final cell.
-  const slideTiles: Tile[] = [];
+  const result: Tile[] = [];
 
-  for (const r of traversals.rows) {
-    for (const c of traversals.cols) {
-      const tile = grid[r][c];
-      if (!tile) continue;
+  for (const { r, c } of order) {
+    const tile = grid[r][c];
+    if (!tile) continue;
 
-      const { farthest, next } = findFarthest(grid, r, c, vector);
-      const nextKey = `${next.row},${next.col}`;
-      const farKey = `${farthest.row},${farthest.col}`;
+    const { farthest, next } = findFarthest(grid, r, c, vector);
+    const inBounds =
+      next.row >= 0 && next.row < SIZE && next.col >= 0 && next.col < SIZE;
+    const nextTile = inBounds ? grid[next.row][next.col] : null;
 
-      const inBounds =
-        next.row >= 0 && next.row < SIZE && next.col >= 0 && next.col < SIZE;
-      const nextTile = inBounds ? grid[next.row][next.col] : null;
+    if (nextTile && nextTile.value === tile.value && !nextTile.isMerged) {
+      // Merge: the partner (nextTile) stays put and flashes; the moving tile
+      // slides onto the same cell, sits underneath, and is removed after.
+      moved = true;
+      scoreDelta += tile.value * 2;
 
-      if (
-        nextTile &&
-        nextTile.value === tile.value &&
-        !mergedAt.has(nextKey)
-      ) {
-        // Merge: current tile slides onto the next tile's cell, both then
-        // collapse into a new merged tile after the slide animation.
-        mergedAt.add(nextKey);
-        scoreDelta += tile.value * 2;
-        moved = true;
-
-        grid[r][c] = null;
-
-        slideTiles.push({ ...tile, row: next.row, col: next.col });
-        // nextTile stays in place (already at merge cell); keep it in slideTiles.
-        slideTiles.push({ ...nextTile, row: next.row, col: next.col });
-
-        merges.push({
-          newId: crypto.randomUUID(),
-          value: tile.value * 2,
-          row: next.row,
-          col: next.col,
-          sourceIds: [tile.id, nextTile.id],
-        });
-      } else {
-        if (farKey !== `${r},${c}`) moved = true;
-        grid[r][c] = null;
-        grid[farthest.row][farthest.col] = tile;
-        slideTiles.push({ ...tile, row: farthest.row, col: farthest.col });
-      }
+      grid[r][c] = null;
+      // Mark partner as the merged (surviving) tile with doubled value.
+      nextTile.value = tile.value * 2;
+      nextTile.isMerged = true;
+      // Moving tile slides to the partner's cell and is flagged for removal.
+      const moving = { ...tile, row: next.row, col: next.col, isRemoving: true };
+      result.push(moving);
+      // Partner already in result if it was processed earlier; ensure present.
+      if (!result.includes(nextTile)) result.push(nextTile);
+    } else {
+      if (farthest.row !== r || farthest.col !== c) moved = true;
+      grid[r][c] = null;
+      grid[farthest.row][farthest.col] = tile;
+      tile.row = farthest.row;
+      tile.col = farthest.col;
+      if (!result.includes(tile)) result.push(tile);
     }
   }
 
-  return { tiles: slideTiles, merges, scoreDelta, moved };
+  return { tiles: result, scoreDelta, moved };
 }
 
 /**
- * Apply pending merges to the slid tiles: remove the two source tiles for each
- * merge and insert the merged tile (flagged isMerged) in their place.
+ * After the slide animation finishes, drop the removing tiles. The merged
+ * partners (isMerged) are already in the array with their new values.
  */
-export function applyMerges(tiles: Tile[], merges: MergeInfo[]): Tile[] {
-  if (merges.length === 0) return tiles;
-  const removeIds = new Set(merges.flatMap((m) => m.sourceIds));
-  const mergedTiles: Tile[] = merges.map((m) => ({
-    id: m.newId,
-    value: m.value,
-    row: m.row,
-    col: m.col,
-    isNew: false,
-    isMerged: true,
-  }));
-  return [...tiles.filter((t) => !removeIds.has(t.id)), ...mergedTiles];
+export function finalize(tiles: Tile[]): Tile[] {
+  return tiles
+    .filter((t) => !t.isRemoving)
+    .map((t) => ({ ...t, isMerged: false }));
 }
 
-function buildTraversals(dir: Direction): {
-  rows: number[];
-  cols: number[];
-} {
+function traversalOrder(dir: Direction): Array<{ r: number; c: number }> {
+  const order: Array<{ r: number; c: number }> = [];
   const rows = [0, 1, 2, 3];
   const cols = [0, 1, 2, 3];
-  if (dir === 'down') rows.reverse();
-  if (dir === 'right') cols.reverse();
-  return { rows, cols };
+  // Process tiles starting from the edge they're moving toward, so the
+  // edge-most tile settles first and later tiles stack/merge behind it.
+  if (dir === 'up') {
+    for (const r of rows) for (const c of cols) order.push({ r, c });
+  } else if (dir === 'down') {
+    for (const r of [...rows].reverse()) for (const c of cols) order.push({ r, c });
+  } else if (dir === 'left') {
+    for (const c of cols) for (const r of rows) order.push({ r, c });
+  } else {
+    for (const c of [...cols].reverse()) for (const r of rows) order.push({ r, c });
+  }
+  return order;
 }
 
 function vectorFor(dir: Direction): { row: number; col: number } {
@@ -202,12 +184,13 @@ export function checkWin(tiles: Tile[]): boolean {
 }
 
 export function checkGameOver(tiles: Tile[]): boolean {
-  if (emptyCells(tiles).length > 0) return false;
+  const active = tiles.filter((t) => !t.isRemoving);
+  if (emptyCells(active).length > 0) return false;
 
   const grid: number[][] = Array.from({ length: SIZE }, () =>
     Array.from({ length: SIZE }, () => 0)
   );
-  for (const t of tiles) grid[t.row][t.col] = t.value;
+  for (const t of active) grid[t.row][t.col] = t.value;
 
   for (let r = 0; r < SIZE; r++) {
     for (let c = 0; c < SIZE; c++) {

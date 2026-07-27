@@ -10,12 +10,14 @@ export function Tile({ tile }: TileProps) {
     left: `calc(var(--gap) + ${tile.col} * (var(--tile-size) + var(--gap)))`,
     background: `var(--tile-${tile.value})`,
     color: `var(--tile-text-${tile.value})`,
+    zIndex: tile.isRemoving ? 1 : 2,
   };
 
   const className = [
     'tile',
     tile.isNew ? 'tile--new' : '',
     tile.isMerged ? 'tile--merged' : '',
+    tile.isRemoving ? 'tile--removing' : '',
   ]
     .filter(Boolean)
     .join(' ');

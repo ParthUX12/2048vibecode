@@ -1,19 +1,18 @@
 import { useCallback, useEffect, useReducer, useRef } from 'react';
 import type { Direction, GameState, Tile } from '@/types';
 import {
-  applyMerges,
   checkGameOver,
   checkWin,
+  finalize,
   initBoard,
   move,
   spawnTile,
-  type MergeInfo,
 } from '@/utils/gameLogic';
 import { useLocalStorage } from './useLocalStorage';
 
 type Action =
   | { type: 'MOVE'; dir: Direction }
-  | { type: 'MERGE_PHASE' }
+  | { type: 'FINALIZE' }
   | { type: 'NEW_GAME' }
   | { type: 'UNDO' }
   | { type: 'CONTINUE' };
@@ -22,7 +21,6 @@ interface InternalState extends GameState {
   previous: GameState | null;
   continued: boolean;
   animating: boolean;
-  pendingMerges: MergeInfo[];
 }
 
 function freshState(best: number): InternalState {
@@ -37,7 +35,6 @@ function freshState(best: number): InternalState {
     previous: null,
     continued: false,
     animating: false,
-    pendingMerges: [],
   };
 }
 
@@ -70,15 +67,14 @@ function reducer(state: InternalState, action: Action): InternalState {
         canUndo: true,
         previous: snapshot,
         animating: true,
-        pendingMerges: result.merges,
       };
     }
 
-    case 'MERGE_PHASE': {
+    case 'FINALIZE': {
       if (!state.animating) return state;
 
-      const merged = applyMerges(state.tiles, state.pendingMerges);
-      const spawned = spawnTile(merged);
+      const cleaned = finalize(state.tiles);
+      const spawned = spawnTile(cleaned);
 
       let status: GameState['status'] = 'playing';
       if (!state.continued && checkWin(spawned)) {
@@ -92,7 +88,6 @@ function reducer(state: InternalState, action: Action): InternalState {
         tiles: spawned,
         status,
         animating: false,
-        pendingMerges: [],
       };
     }
 
@@ -108,7 +103,6 @@ function reducer(state: InternalState, action: Action): InternalState {
         canUndo: false,
         continued: state.continued,
         animating: false,
-        pendingMerges: [],
       };
     }
 
@@ -136,12 +130,12 @@ export function useGame() {
     dispatch({ type: 'MOVE', dir });
   }, []);
 
-  // After MOVE enters the animating phase, schedule the merge phase so the
-  // slide transition (180ms) completes before tiles collapse.
+  // After MOVE enters the animating phase, schedule finalize so the slide
+  // transition (180ms) completes before removing tiles / spawning.
   useEffect(() => {
     if (!state.animating) return;
     timerRef.current = window.setTimeout(() => {
-      dispatch({ type: 'MERGE_PHASE' });
+      dispatch({ type: 'FINALIZE' });
       timerRef.current = null;
     }, SLIDE_MS);
 
@@ -202,8 +196,6 @@ export function useGame() {
 
     const onMove = (e: TouchEvent) => {
       if (!tracking) return;
-      // Block the browser's native scroll / pull-to-refresh while the user is
-      // swiping on the board so the gesture controls the game instead.
       e.preventDefault();
     };
 

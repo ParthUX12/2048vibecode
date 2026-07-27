@@ -7,6 +7,7 @@ export interface Tile {
   col: number;
   isNew: boolean;
   isMerged: boolean;
+  isRemoving: boolean;
 }
 
 export interface GameState {
